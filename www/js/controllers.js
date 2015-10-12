@@ -1,44 +1,91 @@
 angular.module('agentapp.controllers', ['ionic', "angular-hal"])
-    .controller('TicketCtrl', function($scope, RESTService) {
+    .controller('TicketCtrl', function($scope, RESTService,$ionicLoading) {
         $scope.tickets = $scope.tickets || [];
-        $scope.loading = true;
+        console.log("here ticket contrl goes");
         RESTService.load().then(function(ticketcoll) {
             ticketcoll.$get("item").then(function(items) {
                 console.log("Got results:", items);
+                console.log("Refresh List of Tickets:", arguments);
                 $scope.tickets = items;
                 $scope.total = items.length;
-                $scope.loading = false;
+                $ionicLoading.hide();
                 $scope.$broadcast('scroll.refreshComplete');
             });
         }, function(error) { console.error("error:", arguments); });
     })
-    .controller('TicketDetailCtrl', function($scope, $stateParams, RESTService) {
-        console.log("TicketDetails:", arguments);
+    .controller('TicketDetailCtrl', function($scope, $stateParams, RESTService,$ionicLoading,$ionicActionSheet,$ionicPopup) {
+        console.log("TicketDetails Controller :", arguments);
         $scope.ticket = null;
         $scope.loading = true;
-        $scope.id = $stateParams.id;
-        
+        $scope.id = $stateParams.ticketId;
+        //call ActionSheet
+        $scope.showActionsheet = function() {
+          $ionicActionSheet.show({
+                  buttons: [
+                    { text: 'Resolve' },
+                    { text: 'Review' },
+                    { text: 'Suspend' },
+                    { text: 'Respond' },
+                    { text: 'Start Travel' },
+                    { text: 'Edit' },
+                    { text: '<i class="icon ion-arrow-move"></i> Start Travel' },
+                  ],
+                  buttonClicked: function(index) {
+                    switch (index){
+                      case 0 :
+                        $scope.showAlert = function() {
+                          var alertPopup = $ionicPopup.alert({
+                            title: 'Resolve Button',
+                            template: 'Resolve Button Popup'
+                          })}
+                      case 1 :
+                        //Handle Move Button
+                        return true;
+                      case 2 :
+                        //Handle Move Button
+                        return true;
+                      case 3 :
+                        //Handle Move Button
+                        return true;
+                      case 4 :
+                        //Handle Move Button
+                        return true;
+                      case 5 :
+                        //Handle Move Button
+                        return true;
+                      case 6 :
+                        //Handle Move Button
+                        return true;
+                    }
+                  }
+          });
+
+        }
+        console.log("Loading Ticket Data :", arguments);
         RESTService.loadTicket($scope.id).then(function(ticket) {
+          console.log("iM ticket here:", arguments);
             $scope.ticket = ticket;
-            $scope.loading = false;
+            $ionicLoading.hide();
             $scope.$broadcast('scroll.refreshComplete');
         }, function(error) { console.error("error:", arguments); });
     })
-    .controller("LoginCtrl", function($scope, $state, RESTService, UserInfo) {
+    .controller("LoginCtrl", function($scope, $state, RESTService, UserInfo,$ionicLoading) {
+
         $scope.user_data = $scope.user_data || {
             "username": "",
             "password": "",
             "server":RESTService.url
         };
         $scope.login = function() {
-            if ($scope.user_data.server && RESTService.url != $scope.user_data.server) {
-                RESTService.set_url($scope.user_data.server);
-            }
-            RESTService.login($scope.user_data.username, $scope.user_data.password).then(function(app) {
+          console.log("here login goes");
+            RESTService.login_rest($scope.user_data.username, $scope.user_data.password).then(function(app) {
                 if (app.error) {
-                    $scope.error = app.error;
+                  console.log("Oh snaps, error on webservice");
+                  $ionicLoading.hide();
+                  $scope.error = app.error;
                 }
                 else {
+                  console.log("Oh snaps, no error on webservice");
                     app.$get("uly:user").then(function(user) {
                         UserInfo.setUserData({
                             "username": $scope.user_data.username,
@@ -51,15 +98,17 @@ angular.module('agentapp.controllers', ['ionic', "angular-hal"])
                         });
                         $scope.error = "";
                         //navigate to home
-                        $state.go("tickets");
+                        $state.go("tab.tickets");
                     });
                 }
 
             }, function(error) {
-                $scope.error = "Invalid credentials";
+                $ionicLoading.hide();
+                $scope.error = "Invalid credentials: ";
             });
         };
-    }).controller("NewTicketCtrl", function($scope, $state, RESTService, TicketInfo) {
+    })
+  .controller("NewTicketCtrl", function($scope, $state, RESTService, TicketInfo) {
         $scope.ticket_data = $scope.ticket_data || {
             "title": "Test New Ticket",
             "body": "Test Test 123"
@@ -86,13 +135,24 @@ angular.module('agentapp.controllers', ['ionic', "angular-hal"])
                     alert("yay a new ticket!");
                     $scope.error = "";
                     //navigate to home
-                    $state.go("tickets");
+                    $state.go("tab.tickets");
                 }
 
             }, function(error) {
                 $scope.error = "Error creating ticket: " + error;
             });
         };
-    });
+    })
+
+  .controller('LoadingCtrl', function($scope, $ionicLoading) {
+    $scope.show = function() {
+      $ionicLoading.show({
+        template: 'Loading...'
+      });
+    };
+    $scope.hide = function(){
+      $ionicLoading.hide();
+    };
+  });
 
 

@@ -3,32 +3,58 @@
 // angular.module is a global place for creating, registering and retrieving Angular modules
 // 'starter' is the name of this angular module example (also set in a <body> attribute in index.html)
 // the 2nd parameter is an array of 'requires'
+
+
+function isRunningInRipple(){
+  // in an actual device(or emulator) all url's in the webview are 'file:// ... ' (since I don't load any external urls)
+  return document.URL.indexOf('http://') >= 0 || document.URL.indexOf('https://') >= 0;
+}
+
 console.log("starting ionic");
 angular.module('agentapp', ['ionic', "angular-hal", "agentapp.controllers"])
     .config(function($httpProvider) {
         $httpProvider.defaults.withCredentials = true;
     })
+
     .config(function($stateProvider, $urlRouterProvider) {
         console.log("configuring router");
-        $urlRouterProvider.otherwise("tickets");
+        $urlRouterProvider.otherwise("login");
         console.log("configuring routes");
         $stateProvider
+
+            .state('tab', {
+              url: '/tab',
+              abstract: true,
+              templateUrl: 'templates/tabs.html'
+            })
+
             .state("login", {
                 url:"/login",
                 templateUrl:"templates/login.html",
                 controller:"LoginCtrl",
                 public: true
             })
-            .state("tickets", {
-                url:"/tickets",
-                templateUrl:"templates/tickets.html",
-                controller:"TicketCtrl"
+
+            .state('tab.tickets', {
+              url: '/tickets',
+              views: {
+                'tab-tickets': {
+                  templateUrl: 'templates/tickets.html',
+                  controller: 'TicketCtrl'
+                }
+              }
             })
-            .state("tickets.detail", {
-                url:"/:ticketId",
-                templateUrl:"templates/ticket.html",
-                controller:"TicketDetailCtrl"
+
+            .state('tab.ticket-detail', {
+              url:"/tickets/:ticketId",
+              views: {
+                'tab-tickets': {
+                  templateUrl: 'templates/ticket.html',
+                  controller: 'TicketDetailCtrl'
+                }
+              }
             })
+
             .state("new_ticket", {
                 url:"/new_ticket",
                 templateUrl:"templates/new_ticket.html",
@@ -40,6 +66,9 @@ angular.module('agentapp', ['ionic', "angular-hal", "agentapp.controllers"])
                 public: true
             });
     })
+
+
+  //factory services
     .factory("UserInfo", function() {
 
         console.log("creating UserInfo service");
@@ -63,6 +92,7 @@ angular.module('agentapp', ['ionic', "angular-hal", "agentapp.controllers"])
             }
         };
     })
+
     .factory("TicketInfo", function() {
         var ticketData = {};
         return {
@@ -74,22 +104,29 @@ angular.module('agentapp', ['ionic', "angular-hal", "agentapp.controllers"])
             }
         };
     })
-    .factory('RESTService', function(halClient, UserInfo) {
+
+    .factory('RESTService', function(halClient, UserInfo,$ionicLoading) {
         console.log("creating rest service");
-        
-        var root = halClient.$get("http://10.141.2.157:6543/api/v2");
+
+        var root = halClient.$get("http://10.141.2.176:6543/api/v2/");
         return  {
-            "url": "http://10.141.2.157:6543",
+            "url": "http://10.141.2.176:6543",
             "set_url": function(new_root) {
                 this.url = new_root;
-                root = halClient.$get(new_root + "/api/v2");
+                root = halClient.$get(new_root + "/api/v2/");
                 return root;
             },
             "start": function() {
                 return root;
             },
-            'login' : function(username, password) {
-                console.error("Logging in with:", username, password);
+            'login_rest' : function(username, password) {
+                $ionicLoading.show({
+                  template: '<ion-spinner icon="lines"></ion-spinner>',
+                  animation: 'fade-in',
+                  showBackdrop: true,
+                  showDelay: 0
+                });
+                //console.error("Logging in with:", username, password);
                 return root.then(function(resource) {
                     return resource.$get("uly:app").then(function(app) {
                         return app.$post("uly:signin", {
@@ -100,6 +137,7 @@ angular.module('agentapp', ['ionic', "angular-hal", "agentapp.controllers"])
                     }).then(function(login) {
                         console.log("got login:", login);
                         if (login.token) {
+                          console.log("Im here:", login);
                             UserInfo.setToken(login.token);
                         }
                         return login.$get("uly:app");
@@ -107,13 +145,21 @@ angular.module('agentapp', ['ionic', "angular-hal", "agentapp.controllers"])
                 });
             },
             'load' : function() {
+              $ionicLoading.show({
+                template: '<ion-spinner icon="lines"></ion-spinner>',
+                animation: 'fade-in',
+                showBackdrop: true,
+                showDelay: 0
+              });
                 return root.then(function(resource) {
                     return resource.$get("uly:data");
                 })
                     .then(function(data) {
+                        console.log("loading tickets now");
                         var currentUser = UserInfo.getUserData();
                         var uid = currentUser.id;
-                        var filter = "(assignee_id='"+uid+"')";
+                        var filter = "assignee_id='"+uid+"'";
+                        console.log("Done Loading Tickets");
                         return data.$get("uly:ticket", {"embed":1, "filters":filter });
                     });
             },
@@ -126,17 +172,26 @@ angular.module('agentapp', ['ionic', "angular-hal", "agentapp.controllers"])
                     });
                 });
             },
-            loadTicket: function(id) {
+            'loadTicket': function(id) {
+              $ionicLoading.show({
+                template: '<ion-spinner icon="lines"></ion-spinner>',
+                animation: 'fade-in',
+                showBackdrop: true,
+                showDelay: 0
+              });
                 return root.then(function(resource) {
+                      console.log("GET API DATA" + id);
                     return resource.$get("uly:data");
                 })
                     .then(function(data) {
-                        return data.$get("find", {"rel":"ticket/"+id});
+                          console.log("GETTING TICKET"+id);
+                        return data.$get("find", {"rel":"/ticket/"+id});
                     });
             }
-            
+
         };
     })
+
     .factory('httpRequestInterceptor', function (UserInfo) {
         return {
             request: function (config) {
@@ -164,18 +219,36 @@ angular.module('agentapp', ['ionic', "angular-hal", "agentapp.controllers"])
             }
         };
     })
-    .config(function($httpProvider) {
+
+    //end factory services
+    //ripple function
+
+.config(function($httpProvider) {
         $httpProvider.interceptors.push('httpRequestInterceptor');
     })
-    .run(function($ionicPlatform, $rootScope, $location, UserInfo, $state) {
-        $ionicPlatform.ready(function() {
+    .config(function($ionicConfigProvider) {
+      $ionicConfigProvider.tabs.position('bottom');
+    })
+    .run(function($ionicPlatform, $rootScope, $location, UserInfo, $state,$timeout) {
+          function disableRipplePopup() {
+            var dialogBody = parent.document.getElementById("exec-dialog");
+            var overlay = parent.document.querySelector(".ui-widget-overlay");
+            var ngDialog = angular.element(dialogBody.parentElement);
+            var ngOverlay = angular.element(overlay);
+            var hideRules = { "height": "0px", "width": "0px", "display": "none" };
+            ngDialog.css(hideRules); // hide annoying popup
+            ngOverlay.css(hideRules); // hide annoying popup's backdrop
+          }
+
+          $ionicPlatform.ready(function() {
             // Hide the accessory bar by default (remove this to show the accessory bar above the keyboard
             // for form inputs)
+            if(isRunningInRipple()) $timeout(disableRipplePopup);
             if(window.cordova && window.cordova.plugins.Keyboard) {
                 cordova.plugins.Keyboard.hideKeyboardAccessoryBar(true);
             }
             if(window.StatusBar) {
-                StatusBar.styleDefault();
+              StatusBar.styleLightContent();
             }
         });
         console.log("running");
@@ -186,9 +259,10 @@ angular.module('agentapp', ['ionic', "angular-hal", "agentapp.controllers"])
                 console.log("got user:", user);
                 if (!(user && user.fullname))  {
                     ev.preventDefault();
+                  console.log("go back login");
                     $state.go("login");
                 }
             }
         });
-        
+
     });
